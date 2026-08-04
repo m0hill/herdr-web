@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#101216" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%23101216%22/><path d=%22M17 18v28M47 18v28M17 32h30%22 stroke=%22%23e5c07b%22 stroke-width=%228%22 stroke-linecap=%22round%22/></svg>" />
+    <title>Herdr</title>
+  </head>
+  <body>
+    <main id="app">
+      <div id="terminal" aria-label="Herdr terminal"></div>
+      <div id="status" role="status" data-state="connecting">Connecting…</div>
+      <nav id="touch-keys" aria-label="Terminal keys">
+        <button data-key="escape">Esc</button>
+        <button data-modifier="ctrl">Ctrl</button>
+        <button data-key="tab">Tab</button>
+        <button data-key="arrowleft" aria-label="Left">←</button>
+        <button data-key="arrowup" aria-label="Up">↑</button>
+        <button data-key="arrowdown" aria-label="Down">↓</button>
+        <button data-key="arrowright" aria-label="Right">→</button>
+        <button data-key="enter">Enter</button>
+      </nav>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
