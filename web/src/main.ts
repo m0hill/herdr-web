@@ -7,6 +7,7 @@ const touchKeysElement = requireElement("touch-keys");
 
 let socket: WebSocket | undefined;
 let reconnectTimer: number | undefined;
+let fitFrame: number | undefined;
 let ctrlPending = false;
 
 await init();
@@ -39,12 +40,12 @@ terminal.open(terminalElement);
 fitAddon.fit();
 fitAddon.observeResize();
 terminal.attachCustomWheelEventHandler((event) => {
-  if (!terminal.hasMouseTracking()) return false;
   const steps = Math.max(1, Math.min(5, Math.round(Math.abs(event.deltaY) / 32)));
   sendMouseWheel(event.deltaY < 0 ? "up" : "down", event.clientX, event.clientY, steps, event);
   return true;
 });
-installTouchScrolling();
+installHerdrPointerInput();
+installTouchInput();
 
 terminal.onData((data) => {
   const outgoing = ctrlPending ? applyCtrl(data) : data;
@@ -144,26 +145,87 @@ function sendMouseWheel(
   steps: number,
   modifiers?: Pick<MouseEvent, "shiftKey" | "altKey" | "ctrlKey">,
 ): void {
+  const button = direction === "up" ? 64 : 65;
+  sendInput(mouseSequence(button, clientX, clientY, false, modifiers).repeat(steps));
+}
+
+function mouseSequence(
+  button: number,
+  clientX: number,
+  clientY: number,
+  release: boolean,
+  modifiers?: Pick<MouseEvent, "shiftKey" | "altKey" | "ctrlKey">,
+): string {
   const bounds = terminalElement.getBoundingClientRect();
   const column = Math.max(1, Math.min(terminal.cols, Math.floor(((clientX - bounds.left) / bounds.width) * terminal.cols) + 1));
   const row = Math.max(1, Math.min(terminal.rows, Math.floor(((clientY - bounds.top) / bounds.height) * terminal.rows) + 1));
-  let button = direction === "up" ? 64 : 65;
-  if (modifiers?.shiftKey) button += 4;
-  if (modifiers?.altKey) button += 8;
-  if (modifiers?.ctrlKey) button += 16;
-  sendInput(`\u001b[<${button};${column};${row}M`.repeat(steps));
+  let encodedButton = button;
+  if (modifiers?.shiftKey) encodedButton += 4;
+  if (modifiers?.altKey) encodedButton += 8;
+  if (modifiers?.ctrlKey) encodedButton += 16;
+  return `\u001b[<${encodedButton};${column};${row}${release ? "m" : "M"}`;
 }
 
-function installTouchScrolling(): void {
+function installHerdrPointerInput(): void {
+  let pressedButton: number | undefined;
+
+  terminalElement.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.pointerType === "touch" || event.shiftKey) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      pressedButton = event.button;
+      terminalElement.setPointerCapture(event.pointerId);
+      sendInput(mouseSequence(event.button, event.clientX, event.clientY, false, event));
+      terminal.focus();
+    },
+    { capture: true },
+  );
+
+  terminalElement.addEventListener(
+    "pointermove",
+    (event) => {
+      if (event.pointerType === "touch" || pressedButton === undefined) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      sendInput(mouseSequence(32 + pressedButton, event.clientX, event.clientY, false, event));
+    },
+    { capture: true },
+  );
+
+  terminalElement.addEventListener(
+    "pointerup",
+    (event) => {
+      if (event.pointerType === "touch" || pressedButton === undefined) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      sendInput(mouseSequence(pressedButton, event.clientX, event.clientY, true, event));
+      pressedButton = undefined;
+      terminalElement.releasePointerCapture(event.pointerId);
+    },
+    { capture: true },
+  );
+
+  terminalElement.addEventListener("contextmenu", (event) => event.preventDefault());
+}
+
+function installTouchInput(): void {
+  let startX: number | undefined;
+  let startY: number | undefined;
   let lastY: number | undefined;
   let accumulated = 0;
+  let moved = false;
 
   terminalElement.addEventListener(
     "touchstart",
     (event) => {
       const touch = event.touches.item(0);
+      startX = touch?.clientX;
+      startY = touch?.clientY;
       lastY = touch?.clientY;
       accumulated = 0;
+      moved = false;
     },
     { passive: true, capture: true },
   );
@@ -171,11 +233,11 @@ function installTouchScrolling(): void {
   terminalElement.addEventListener(
     "touchmove",
     (event) => {
-      if (!terminal.hasMouseTracking()) return;
       const touch = event.touches.item(0);
       if (!touch || lastY === undefined) return;
       accumulated += lastY - touch.clientY;
       lastY = touch.clientY;
+      if (Math.abs(accumulated) >= 8) moved = true;
       const steps = Math.trunc(Math.abs(accumulated) / 18);
       if (steps === 0) return;
       event.preventDefault();
@@ -188,8 +250,15 @@ function installTouchScrolling(): void {
   terminalElement.addEventListener(
     "touchend",
     () => {
+      if (!moved && startX !== undefined && startY !== undefined) {
+        sendInput(mouseSequence(0, startX, startY, false) + mouseSequence(0, startX, startY, true));
+      }
+      startX = undefined;
+      startY = undefined;
       lastY = undefined;
       accumulated = 0;
+      moved = false;
+      terminal.focus();
     },
     { passive: true, capture: true },
   );
@@ -205,7 +274,11 @@ function syncVisualViewport(): void {
 }
 
 function fitTerminal(): void {
-  window.requestAnimationFrame(() => fitAddon.fit());
+  if (fitFrame !== undefined) return;
+  fitFrame = window.requestAnimationFrame(() => {
+    fitFrame = undefined;
+    fitAddon.fit();
+  });
 }
 
 function setStatus(state: "connecting" | "connected" | "disconnected", text: string): void {
