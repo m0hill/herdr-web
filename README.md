@@ -8,7 +8,7 @@ A small, responsive browser client for [Herdr](https://herdr.dev), rendered with
 
 Each browser connection starts a normal `herdr` client inside a PTY. Herdr's background server continues to own the workspaces, panes, and agents, so closing the browser only closes that browser's client.
 
-The page adapts to desktop, tablet, and phone viewports, including mobile browser keyboards and safe areas. Touch devices get a compact row of terminal keys. Mouse clicks, dragging, and touch gestures are translated to Herdr's terminal mouse protocol, including pane resizing.
+The page adapts to desktop, tablet, and phone viewports, including mobile browser keyboards and safe areas. Touch devices get a compact row of terminal keys.
 
 ## Requirements
 
